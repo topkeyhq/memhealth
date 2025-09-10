@@ -28,7 +28,7 @@ MemHealth helps you identify which specific requests are consuming excessive mem
 Add this line to your application's Gemfile:
 
 ```ruby
-gem "memhealth", git: "https://github.com/topkeyhq/memhealth"
+gem "memhealth"
 ```
 
 And then execute:
