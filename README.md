@@ -2,7 +2,45 @@
 
 A Rails engine for monitoring memory health, detecting growth patterns (leaks & bloats) and memory swap operations. Helps you identify requests that consume high amounts of RAM and is compatible with Heroku.
 
-## Features
+## Installation
+
+Add this line to your application's Gemfile:
+
+```ruby
+gem "memhealth"
+```
+
+Use initializer `/config/memhealth.rb` to configure Redis connection:
+
+```ruby
+MemHealth.configure do |config|
+  config.redis_url = ENV.fetch("REDIS_URL", "redis://localhost:6379/0")
+end
+```
+
+Enable memory tracking via ENV variable:
+
+```bash
+MEM_HEALTH_ENABLED=true
+```
+
+### Dashboard setup
+
+Mount the engine in your routes within an authenticated section:
+
+```ruby
+# config/routes.rb
+Rails.application.routes.draw do
+  # ... other routes ...
+
+  # Mount within authenticated admin section
+  authenticate :admin_user do
+    mount MemHealth::Engine, at: "/admin/memhealth"
+  end
+end
+```
+
+# Features
 
 - Real-time memory usage monitoring
 - Track highest memory consuming requests
@@ -23,25 +61,7 @@ If you're getting **R14 - Memory quota exceeded** errors, it means your applicat
 
 MemHealth helps you identify which specific requests are consuming excessive memory, allowing you to pinpoint and fix the root cause of these performance issues.
 
-## Installation
-
-Add this line to your application's Gemfile:
-
-```ruby
-gem "memhealth"
-```
-
-And then execute:
-
-    $ bundle install
-
-## Configuration
-
-```ruby
-MemHealth.configure do |config|
-  config.redis_url = ENV.fetch(ENV.fetch("REDIS_URL", "redis://localhost:6379/0"))
-end
-```
+## ENVIRONMENT VARIABLES
 
 Configure Memhealth using environment variables:
 
@@ -55,28 +75,6 @@ Configure Memhealth using environment variables:
 | `MEM_HEALTH_REDIS_KEY`            | Name of environment variable containing Redis URL (e.g., `REDISCLOUD_URL`)     | `REDIS_URL`   |
 
 The gem will read the Redis connection URL from the environment variable specified in `MEM_HEALTH_REDIS_KEY`, falling back to `REDIS_URL` if not specified.
-
-## Usage
-
-Mount the engine in your routes within an authenticated section:
-
-```ruby
-# config/routes.rb
-Rails.application.routes.draw do
-  # ... other routes ...
-
-  # Mount within authenticated admin section
-  authenticate :admin_user do
-    mount MemHealth::Engine, at: "/admin/memhealth"
-  end
-end
-```
-
-Enable memory tracking by setting:
-
-```bash
-MEM_HEALTH_ENABLED=true
-```
 
 ### ActiveAdmin Integration
 
