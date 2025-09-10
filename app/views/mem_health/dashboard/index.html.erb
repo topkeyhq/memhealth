@@ -1,0 +1,181 @@
+<div class="px-6 pb-6">
+  <% if @memory_hunter_enabled %>
+    <!-- Memory Hunter Enabled Status -->
+    <div class="bg-green-50 border border-green-200 rounded-lg px-6 py-4 mb-6">
+      <h3 class="text-lg font-semibold text-green-800 mb-2">✅ MemHealth Enabled</h3>
+      <p class="text-sm text-green-700">Memory profiling is active and tracking requests. To disable, set <code class="bg-green-100 px-1 rounded">ENV["MEM_HEALTH_ENABLED"]=false</code></p>
+    </div>
+
+    <!-- Highest Memory Usage URL - Prominent display -->
+    <% if @max_memory_url %>
+      <div class="bg-red-50 border border-red-200 rounded-lg px-6 py-6 mb-6">
+        <h3 class="text-lg font-semibold text-red-800 mb-4">🚨 Highest Memory Usage URL</h3>
+
+        <div class="bg-white rounded-md px-6 py-4 border border-red-100">
+          <!-- URL Section -->
+          <div class="mb-4">
+            <dt class="text-sm font-medium text-gray-500 mb-1">URL</dt>
+            <dd class="text-sm text-gray-900 font-mono bg-gray-100 px-2 py-1 rounded truncate ml-0">
+              <%= @max_memory_url["url"] %>
+            </dd>
+          </div>
+
+          <!-- Four column layout using flex -->
+          <div class="flex gap-4">
+            <% if @max_memory_url["ram_before"] && @max_memory_url["ram_after"] %>
+              <div class="flex-1 text-left">
+                <dt class="text-sm font-medium text-gray-500 mb-1">RAM Usage</dt>
+                <dd class="text-sm text-gray-600 ml-0">
+                  <%= @max_memory_url["ram_before"] %> MB → <%= @max_memory_url["ram_after"] %> MB
+                </dd>
+              </div>
+            <% end %>
+
+            <div class="flex-1 text-left">
+              <dt class="text-sm font-medium text-gray-500 mb-1">Recorded At</dt>
+              <dd class="text-sm text-gray-600 ml-0"><%= Time.parse(@max_memory_url["recorded_at"]).utc.strftime("%Y-%m-%d %H:%M") %></dd>
+            </div>
+
+            <% if @max_memory_url["account_id"].present? %>
+              <div class="flex-1 text-left">
+                <dt class="text-sm font-medium text-gray-500 mb-1">Account ID</dt>
+                <dd class="text-sm text-gray-600 ml-0"><%= @max_memory_url["account_id"] %></dd>
+              </div>
+            <% end %>
+
+            <div class="flex-1 text-left">
+              <div class="bg-red-100 border border-red-300 rounded-md px-4 py-3">
+                <dt class="text-sm font-medium text-red-700 mb-1">Memory Diff</dt>
+                <dd class="text-lg font-bold text-red-800 ml-0">
+                  <%= @max_memory_url["memory_diff"] %> MB
+                </dd>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    <% end %>
+
+    <!-- Stats summary card -->
+    <div class="bg-white rounded-lg shadow px-6 py-6 mb-6">
+      <h3 class="text-lg font-medium text-gray-900 mb-4">Memory Usage Statistics</h3>
+
+      <div class="flex gap-4">
+        <div class="bg-blue-50 p-4 rounded-md flex-1 text-left">
+          <dt class="text-sm font-medium text-blue-600">Max Memory Difference</dt>
+          <dd class="mt-1 text-2xl font-semibold text-blue-900 text-left ml-0"><%= @stats[:max_memory_diff] %> MB</dd>
+        </div>
+
+        <div class="bg-green-50 p-4 rounded-md flex-1 text-left">
+          <dt class="text-sm font-medium text-green-600">Stored URLs</dt>
+          <dd class="mt-1 text-2xl font-semibold text-green-900 text-left ml-0"><%= @stats[:stored_urls_count] %>/<%= @stats[:max_stored_urls] %></dd>
+        </div>
+
+        <div class="bg-yellow-50 p-4 rounded-md flex-1 text-left">
+          <dt class="text-sm font-medium text-yellow-600">Requests Tracked</dt>
+          <dd class="mt-1 text-2xl font-semibold text-yellow-900 text-left ml-0"><%= @stats[:tracked_requests_count] %></dd>
+        </div>
+
+        <div class="bg-purple-50 p-4 rounded-md flex-1 text-left">
+          <dt class="text-sm font-medium text-purple-600">Total Requests on current dyno/Rails instance</dt>
+          <dd class="mt-1 text-2xl font-semibold text-purple-900 text-left ml-0"><%= @stats[:total_requests_count] %></dd>
+          <% if @stats[:skipped_requests_count] > 0 %>
+            <p class="text-xs text-purple-500 mt-1"><%= @stats[:skipped_requests_count] %> skipped</p>
+          <% end %>
+        </div>
+      </div>
+    </div>
+
+    <!-- Top URLs table -->
+    <% if @top_urls.any? %>
+      <div class="bg-white rounded-lg shadow overflow-hidden">
+        <div class="px-6 py-4 border-b border-gray-200">
+          <h3 class="text-lg font-medium text-gray-900">Top <%= MemHealth.configuration.max_stored_urls %> URLs by Memory Usage</h3>
+          <p class="text-sm text-gray-600 mt-1">URLs ordered by memory difference (highest first) - maximum <%= MemHealth.configuration.max_stored_urls %> URLs stored</p>
+        </div>
+
+        <table class="min-w-full divide-y divide-gray-200">
+          <thead class="bg-gray-50">
+            <tr>
+              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Memory Diff</th>
+              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">RAM Before</th>
+              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">RAM After</th>
+              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">URL</th>
+              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Account ID</th>
+              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Recorded At</th>
+            </tr>
+          </thead>
+
+          <tbody class="bg-white divide-y divide-gray-200">
+            <% @top_urls.each do |url_data| %>
+              <tr>
+                <td class="px-6 py-4 whitespace-nowrap">
+                  <% 
+                    memory_color = if url_data["memory_diff"] > 10
+                      "bg-red-100 text-red-800"
+                    elsif url_data["memory_diff"] > 5
+                      "bg-yellow-100 text-yellow-800"
+                    else
+                      "bg-green-100 text-green-800"
+                    end
+                  %>
+                  <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full <%= memory_color %>">
+                    <%= url_data["memory_diff"] %> MB
+                  </span>
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                  <%= url_data["ram_before"] ? "#{url_data["ram_before"]} MB" : "/" %>
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                  <%= url_data["ram_after"] ? "#{url_data["ram_after"]} MB" : "/" %>
+                </td>
+                <td class="px-6 py-4 text-sm text-gray-900">
+                  <div class="max-w-xs truncate">
+                    <code class="bg-gray-100 px-2 py-1 rounded text-xs"><%= url_data["url"] %></code>
+                  </div>
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                  <%= url_data["account_id"].present? ? url_data["account_id"] : "/" %>
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                  <%= Time.parse(url_data["recorded_at"]).utc.strftime("%Y-%m-%d %H:%M") %>
+                </td>
+              </tr>
+            <% end %>
+          </tbody>
+        </table>
+      </div>
+    <% else %>
+      <div class="bg-white rounded-lg shadow px-6 py-4 text-center">
+        <h3 class="text-lg font-medium text-gray-900 mb-2">No URLs Tracked Yet</h3>
+        <p class="text-gray-600">No URLs have been recorded yet.</p>
+        <p class="text-sm text-gray-500 mt-2">Memory tracking will begin after the first <%= MemHealth.configuration.skip_requests %> requests to your application.</p>
+      </div>
+    <% end %>
+
+    <!-- Action buttons -->
+    <div class="mt-6 space-y-3">
+      <div class="flex gap-4">
+        <%= form_with url: clear_path, method: :post, local: true, class: "inline" do |form| %>
+          <%= form.button "🗑️ Reset Stats",
+                type: "submit",
+                onclick: "return confirm('Are you sure you want to reset all memory usage statistics? This will clear all data including max memory difference and URLs.')",
+                class: "inline-flex items-center px-6 py-3 border-2 border-red-400 text-sm font-semibold rounded-md text-red-800 bg-red-50 hover:bg-red-100 focus:ring-2 focus:ring-red-500 shadow-sm cursor-pointer" %>
+        <% end %>
+      </div>
+    </div>
+  <% else %>
+    <!-- Memory Hunter Disabled Status -->
+    <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-6 mb-6">
+      <h3 class="text-lg font-semibold text-yellow-800 mb-4">⚠️ MemHealth Disabled</h3>
+
+      <div class="bg-white rounded-md p-4 border border-yellow-100">
+        <p class="text-sm text-gray-700 mb-3">Memory profiling is currently disabled. To enable memory growth tracking:</p>
+
+        <div class="bg-gray-900 text-green-400 p-3 rounded font-mono text-sm mb-3">
+          Set ENV['MEM_HEALTH_ENABLED'] = true
+        </div>
+      </div>
+    </div>
+  <% end %>
+</div>
