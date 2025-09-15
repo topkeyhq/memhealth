@@ -1,4 +1,4 @@
-require "get_process_mem"
+require 'get_process_mem'
 
 module MemHealth
   class Middleware
@@ -16,19 +16,38 @@ module MemHealth
     def call(env)
       @@request_count += 1
 
+      # Track execution time
+      start_time = Process.clock_gettime(Process::CLOCK_MONOTONIC)
+
       before = GetProcessMem.new.mb
       status, headers, response = @app.call(env)
       after = GetProcessMem.new.mb
 
+      # Calculate execution time in seconds
+      end_time = Process.clock_gettime(Process::CLOCK_MONOTONIC)
+      execution_time = (end_time - start_time).round(2)
+
       memory_diff = (after - before).round(2)
-      request_url = build_request_url(env)
+      request = Rack::Request.new(env)
+      request_url = request.fullpath
       account_info = extract_account_info(env)
+
+      # Collect additional metadata
+      metadata = {
+        puma_thread_index: Thread.current[:puma_thread_index],
+        dyno: ENV['DYNO'],
+        execution_time: execution_time,
+        request_method: request.request_method
+      }
 
       # Skip the first few requests as they have large memory jumps due to class loading
       if @@request_count > config.skip_requests
         redis.incr(redis_tracked_requests_key)
         should_track = memory_diff > config.memory_threshold_mb && before.round(2) > config.ram_before_threshold_mb
-        track_memory_usage(memory_diff, request_url, before.round(2), after.round(2), account_info) if should_track
+        if should_track
+          track_memory_usage(memory_diff, request_url, before.round(2), after.round(2),
+                             account_info.merge(metadata))
+        end
       else
         @@skipped_requests_count += 1
       end
@@ -80,7 +99,7 @@ module MemHealth
       self.class.redis_tracked_requests_key
     end
 
-    def track_memory_usage(memory_diff, request_url, ram_before, ram_after, account_info = {})
+    def track_memory_usage(memory_diff, request_url, ram_before, ram_after, request_metadata = {})
       # Update max memory diff seen so far
       current_max = redis.get(redis_max_diff_key)&.to_f || 0.0
       if memory_diff > current_max
@@ -94,7 +113,7 @@ module MemHealth
           ram_after: ram_after,
           timestamp: Time.current.to_i,
           recorded_at: Time.current.iso8601
-        }.merge(account_info)
+        }.merge(request_metadata)
         redis.set(redis_max_diff_url_key, max_url_data.to_json)
       end
 
@@ -107,25 +126,17 @@ module MemHealth
         ram_after: ram_after,
         timestamp: timestamp,
         recorded_at: Time.current.iso8601
-      }.merge(account_info)
+      }.merge(request_metadata)
 
       # Add URL to sorted set (score = memory_diff for DESC ordering)
       redis.zadd(redis_high_usage_urls_key, memory_diff, url_data.to_json)
 
       # Keep only top N URLs by removing lowest scores
       current_count = redis.zcard(redis_high_usage_urls_key)
-      if current_count > config.max_stored_urls
-        # Remove the lowest scoring URLs (keep top max_stored_urls)
-        redis.zremrangebyrank(redis_high_usage_urls_key, 0, current_count - config.max_stored_urls - 1)
-      end
-    end
+      return unless current_count > config.max_stored_urls
 
-    def build_request_url(env)
-      request = Rack::Request.new(env)
-      url = "#{request.request_method} #{request.fullpath}"
-
-      # Truncate very long URLs
-      (url.length > 600) ? "#{url[0..650]}..." : url
+      # Remove the lowest scoring URLs (keep top max_stored_urls)
+      redis.zremrangebyrank(redis_high_usage_urls_key, 0, current_count - config.max_stored_urls - 1)
     end
 
     def extract_account_info(env)
@@ -136,13 +147,13 @@ module MemHealth
         if defined?(ActsAsTenant) && ActsAsTenant.current_tenant
           account = ActsAsTenant.current_tenant
           account_info[:account_id] = account.id
-        elsif env["warden"]&.user&.respond_to?(:account)
+        elsif env['warden']&.user&.respond_to?(:account)
           # Try to get from authenticated user
-          account = env["warden"].user.account
+          account = env['warden'].user.account
           account_info[:account_id] = account.id
-        elsif env["HTTP_X_ACCOUNT_ID"]
+        elsif env['HTTP_X_ACCOUNT_ID']
           # Fallback to header if available
-          account_info[:account_id] = env["HTTP_X_ACCOUNT_ID"]
+          account_info[:account_id] = env['HTTP_X_ACCOUNT_ID']
         end
       rescue StandardError => _e
         # Silently fail if account extraction fails

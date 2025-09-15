@@ -129,6 +129,17 @@
       
       .truncate { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
       .whitespace-nowrap { white-space: nowrap; }
+
+      /* URL truncation in table */
+      td.url-cell {
+        max-width: 500px;
+      }
+
+      td.url-cell > div {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
       .text-center { text-align: center; }
       .text-left { text-align: left; }
       .uppercase { text-transform: uppercase; }
@@ -158,7 +169,7 @@
       }
       
       /* Container styles */
-      .container { max-width: 1200px; margin: 0 auto; }
+      .container { max-width: 1600px; margin: 0 auto; }
       
       /* Header styles */
       .header { 
