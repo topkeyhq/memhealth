@@ -15,34 +15,18 @@
           <!-- URL Section -->
           <div class="mb-4">
             <dt class="text-sm font-medium text-gray-500 mb-1">URL</dt>
-            <dd class="text-sm text-gray-900 font-mono bg-gray-100 px-2 py-1 rounded truncate ml-0">
-              <%= @max_memory_url["url"] %>
+            <dd class="text-sm text-gray-900 font-mono bg-gray-100 px-2 py-1 rounded ml-0 flex items-center gap-2" title="<%= @max_memory_url["url"] %>">
+              <% if @max_memory_url["request_method"] %>
+                <span class="inline-flex px-2 py-1 text-xs font-semibold rounded flex-shrink-0 <%= @max_memory_url["request_method"] == 'GET' ? 'bg-blue-100 text-blue-800' : 'bg-green-100 text-green-800' %>">
+                  <%= @max_memory_url["request_method"] %>
+                </span>
+              <% end %>
+              <span class="truncate"><%= @max_memory_url["url"] %></span>
             </dd>
           </div>
 
-          <!-- Four column layout using flex -->
+          <!-- Single row with all metadata -->
           <div class="flex gap-4">
-            <% if @max_memory_url["ram_before"] && @max_memory_url["ram_after"] %>
-              <div class="flex-1 text-left">
-                <dt class="text-sm font-medium text-gray-500 mb-1">RAM Usage</dt>
-                <dd class="text-sm text-gray-600 ml-0">
-                  <%= @max_memory_url["ram_before"] %> MB → <%= @max_memory_url["ram_after"] %> MB
-                </dd>
-              </div>
-            <% end %>
-
-            <div class="flex-1 text-left">
-              <dt class="text-sm font-medium text-gray-500 mb-1">Recorded At</dt>
-              <dd class="text-sm text-gray-600 ml-0"><%= Time.parse(@max_memory_url["recorded_at"]).utc.strftime("%Y-%m-%d %H:%M") %></dd>
-            </div>
-
-            <% if @max_memory_url["account_id"].present? %>
-              <div class="flex-1 text-left">
-                <dt class="text-sm font-medium text-gray-500 mb-1">Account ID</dt>
-                <dd class="text-sm text-gray-600 ml-0"><%= @max_memory_url["account_id"] %></dd>
-              </div>
-            <% end %>
-
             <div class="flex-1 text-left">
               <div class="bg-red-100 border border-red-300 rounded-md px-4 py-3">
                 <dt class="text-sm font-medium text-red-700 mb-1">Memory Diff</dt>
@@ -50,6 +34,32 @@
                   <%= @max_memory_url["memory_diff"] %> MB
                 </dd>
               </div>
+            </div>
+
+            <div class="flex-1 text-left">
+              <dt class="text-sm font-medium text-gray-500 mb-1">RAM Usage</dt>
+              <dd class="text-sm text-gray-600 ml-0">
+                <%= @max_memory_url["ram_before"] %> MB → <%= @max_memory_url["ram_after"] %> MB
+              </dd>
+            </div>
+
+            <div class="flex-1 text-left">
+              <dt class="text-sm font-medium text-gray-500 mb-1">Execution Time</dt>
+              <dd class="text-sm text-gray-600 ml-0">
+                <%= @max_memory_url["execution_time"] ? "#{@max_memory_url["execution_time"]} s" : "-" %>
+              </dd>
+            </div>
+
+            <div class="flex-1 text-left">
+              <dt class="text-sm font-medium text-gray-500 mb-1">Info</dt>
+              <dd class="text-sm text-gray-600 ml-0">
+                <% info_parts = [] %>
+                <% info_parts << @max_memory_url["dyno"] if @max_memory_url["dyno"] %>
+                <% info_parts << "T#{@max_memory_url["puma_thread_index"]}" if @max_memory_url["puma_thread_index"] %>
+                <% info_parts << "##{@max_memory_url["account_id"]}" if @max_memory_url["account_id"].present? %>
+                <% info_parts << Time.parse(@max_memory_url["recorded_at"]).utc.strftime("%m/%d %H:%M") %>
+                <%= info_parts.join(" / ") %>
+              </dd>
             </div>
           </div>
         </div>
@@ -100,7 +110,9 @@
               <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Memory Diff</th>
               <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">RAM Before</th>
               <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">RAM After</th>
+              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Exec Time</th>
               <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">URL</th>
+              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Dyno/Thread</th>
               <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Account ID</th>
               <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Recorded At</th>
             </tr>
@@ -129,10 +141,24 @@
                 <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                   <%= url_data["ram_after"] ? "#{url_data["ram_after"]} MB" : "/" %>
                 </td>
-                <td class="px-6 py-4 text-sm text-gray-900">
-                  <div class="max-w-xs truncate">
-                    <code class="bg-gray-100 px-2 py-1 rounded text-xs"><%= url_data["url"] %></code>
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                  <%= url_data["execution_time"] ? "#{url_data["execution_time"]} s" : "/" %>
+                </td>
+                <td class="px-6 py-4 text-gray-700 url-cell">
+                  <div title="<%= url_data["url"] %>" style="font-size: 0.75rem; line-height: 1rem;">
+                    <% if url_data["request_method"] %>
+                      <span class="inline-flex px-1 py-0.5 font-semibold rounded <%= url_data["request_method"] == 'GET' ? 'bg-blue-100 text-blue-800' : 'bg-green-100 text-green-800' %>" style="font-size: 0.65rem;">
+                        <%= url_data["request_method"] %>
+                      </span>
+                    <% end %>
+                    <code class="bg-gray-100 px-1 py-0.5 rounded"><%= url_data["url"] %></code>
                   </div>
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                  <% dyno_thread = [] %>
+                  <% dyno_thread << url_data["dyno"] if url_data["dyno"] %>
+                  <% dyno_thread << "T#{url_data["puma_thread_index"]}" if url_data["puma_thread_index"] %>
+                  <%= dyno_thread.any? ? dyno_thread.join("/") : "/" %>
                 </td>
                 <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                   <%= url_data["account_id"].present? ? url_data["account_id"] : "/" %>
