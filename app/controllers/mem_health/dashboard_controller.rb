@@ -2,18 +2,25 @@ module MemHealth
   class DashboardController < ActionController::Base
     protect_from_forgery with: :exception
     layout "memhealth/application"
-    
+
     def index
       @memory_hunter_enabled = MemHealth.configuration.enabled?
+      @view_type = params[:view] || 'web'
 
       if @memory_hunter_enabled
-        @stats = MemHealth::Tracker.stats
-        @top_urls = MemHealth::Tracker.top_memory_urls
-        @max_memory_url = MemHealth::Tracker.max_memory_url
+        if @view_type == 'worker'
+          @stats = MemHealth::Tracker.worker_stats
+          @top_items = MemHealth::Tracker.top_memory_jobs
+          @max_memory_item = MemHealth::Tracker.max_memory_job
+        else
+          @stats = MemHealth::Tracker.stats
+          @top_items = MemHealth::Tracker.top_memory_urls
+          @max_memory_item = MemHealth::Tracker.max_memory_url
+        end
       else
         @stats = nil
-        @top_urls = []
-        @max_memory_url = nil
+        @top_items = []
+        @max_memory_item = nil
       end
     end
 

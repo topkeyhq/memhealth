@@ -1,41 +1,71 @@
 module MemHealth
   class Tracker
     class << self
-      # Get the maximum memory difference recorded
-      def max_memory_diff
-        redis.get(redis_max_diff_key)&.to_f || 0.0
+      # Generic methods for web and worker tracking
+      def max_memory_diff(type: :web)
+        key = type == :worker ? redis_max_diff_worker_key : redis_max_diff_key
+        redis.get(key)&.to_f || 0.0
       end
 
-      # Get all stored URLs, ordered by memory usage (highest first)
-      def top_memory_urls(limit: config.max_stored_urls)
-        redis.zrevrange(redis_high_usage_urls_key, 0, limit - 1, with_scores: true).map do |json_data, score|
+      def top_memory_items(type: :web, limit: config.max_stored_urls)
+        key = type == :worker ? redis_high_usage_jobs_key : redis_high_usage_urls_key
+        redis.zrevrange(key, 0, limit - 1, with_scores: true).map do |json_data, score|
           data = JSON.parse(json_data)
           data.merge("memory_diff" => score)
         end
       end
 
-      # Alias for backward compatibility
-      alias_method :high_usage_urls, :top_memory_urls
-
-      # Get URLs that used more than a specific threshold
-      def urls_above_threshold(threshold_mb)
-        redis.zrangebyscore(redis_high_usage_urls_key, threshold_mb, "+inf", with_scores: true).map do |json_data, score|
+      def items_above_threshold(threshold_mb, type: :web)
+        key = type == :worker ? redis_high_usage_jobs_key : redis_high_usage_urls_key
+        redis.zrangebyscore(key, threshold_mb, "+inf", with_scores: true).map do |json_data, score|
           data = JSON.parse(json_data)
           data.merge("memory_diff" => score)
         end
       end
 
-      # Get the URL with the highest memory usage (the one that set the max diff)
-      def max_memory_url
-        json_data = redis.get(redis_max_diff_url_key)
+      def max_memory_item(type: :web)
+        key = type == :worker ? redis_max_diff_job_key : redis_max_diff_url_key
+        json_data = redis.get(key)
         return nil if json_data.nil?
 
         JSON.parse(json_data)
       end
 
+      # Convenience methods with backward compatibility
+      def max_memory_diff_worker
+        max_memory_diff(type: :worker)
+      end
+
+      def top_memory_urls(limit: config.max_stored_urls)
+        top_memory_items(type: :web, limit: limit)
+      end
+
+      alias_method :high_usage_urls, :top_memory_urls
+
+      def top_memory_jobs(limit: config.max_stored_urls)
+        top_memory_items(type: :worker, limit: limit)
+      end
+
+      def urls_above_threshold(threshold_mb)
+        items_above_threshold(threshold_mb, type: :web)
+      end
+
+      def jobs_above_threshold(threshold_mb)
+        items_above_threshold(threshold_mb, type: :worker)
+      end
+
+      def max_memory_url
+        max_memory_item(type: :web)
+      end
+
+      def max_memory_job
+        max_memory_item(type: :worker)
+      end
+
       # Clear all memory tracking data
       def clear_all_data
-        redis.del(redis_max_diff_key, redis_max_diff_url_key, redis_high_usage_urls_key)
+        redis.del(redis_max_diff_key, redis_max_diff_url_key, redis_high_usage_urls_key,
+                  redis_max_diff_worker_key, redis_max_diff_job_key, redis_high_usage_jobs_key)
         MemHealth::Middleware.reset_data
       end
 
@@ -55,6 +85,18 @@ module MemHealth
           total_requests_count: total_count,
           skipped_requests_count: skipped_count,
           requests_tracked: "#{tracked_count} requests tracked (#{skipped_count} skipped) out of #{total_count} total requests"
+        }
+      end
+
+      # Get worker stats summary
+      def worker_stats
+        max_diff = max_memory_diff_worker
+        stored_jobs_count = redis.zcard(redis_high_usage_jobs_key)
+
+        {
+          max_memory_diff: max_diff,
+          stored_jobs_count: stored_jobs_count,
+          max_stored_jobs: config.max_stored_urls
         }
       end
 
@@ -98,6 +140,18 @@ module MemHealth
 
       def redis_high_usage_urls_key
         "#{config.redis_key_prefix}:high_usage_urls"
+      end
+
+      def redis_max_diff_worker_key
+        "#{config.redis_key_prefix}:worker:max_diff"
+      end
+
+      def redis_max_diff_job_key
+        "#{config.redis_key_prefix}:worker:max_diff_job"
+      end
+
+      def redis_high_usage_jobs_key
+        "#{config.redis_key_prefix}:worker:high_usage_jobs"
       end
     end
   end
