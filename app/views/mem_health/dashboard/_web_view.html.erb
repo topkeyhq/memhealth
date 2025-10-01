@@ -1,0 +1,172 @@
+<!-- Highest Memory Usage URL - Prominent display -->
+<% if @max_memory_item %>
+  <div class="bg-red-50 border border-red-200 rounded-lg px-6 py-6 mb-6">
+    <h3 class="text-lg font-semibold text-red-800 mb-4">🚨 Highest Memory Usage URL</h3>
+
+    <div class="bg-white rounded-md px-6 py-4 border border-red-100">
+      <!-- URL Section -->
+      <div class="mb-4">
+        <dt class="text-sm font-medium text-gray-500 mb-1">URL</dt>
+        <dd class="text-sm text-gray-900 font-mono bg-gray-100 px-2 py-1 rounded ml-0 flex items-center gap-2" title="<%= @max_memory_item["url"] %>">
+          <% if @max_memory_item["request_method"] %>
+            <span class="inline-flex px-2 py-1 text-xs font-semibold rounded flex-shrink-0 <%= @max_memory_item["request_method"] == 'GET' ? 'bg-blue-100 text-blue-800' : 'bg-green-100 text-green-800' %>">
+              <%= @max_memory_item["request_method"] %>
+            </span>
+          <% end %>
+          <span class="truncate"><%= @max_memory_item["url"] %></span>
+        </dd>
+      </div>
+
+      <!-- Single row with all metadata -->
+      <div class="flex gap-4">
+        <div class="flex-1 text-left">
+          <div class="bg-red-100 border border-red-300 rounded-md px-4 py-3">
+            <dt class="text-sm font-medium text-red-700 mb-1">Memory Diff</dt>
+            <dd class="text-lg font-bold text-red-800 ml-0">
+              <%= @max_memory_item["memory_diff"] %> MB
+            </dd>
+          </div>
+        </div>
+
+        <div class="flex-1 text-left">
+          <dt class="text-sm font-medium text-gray-500 mb-1">RAM Usage</dt>
+          <dd class="text-sm text-gray-600 ml-0">
+            <%= @max_memory_item["ram_before"] %> MB → <%= @max_memory_item["ram_after"] %> MB
+          </dd>
+        </div>
+
+        <div class="flex-1 text-left">
+          <dt class="text-sm font-medium text-gray-500 mb-1">Execution Time</dt>
+          <dd class="text-sm text-gray-600 ml-0">
+            <%= @max_memory_item["execution_time"] ? "#{@max_memory_item["execution_time"]} s" : "-" %>
+          </dd>
+        </div>
+
+        <div class="flex-1 text-left">
+          <dt class="text-sm font-medium text-gray-500 mb-1">Info</dt>
+          <dd class="text-sm text-gray-600 ml-0">
+            <% info_parts = [] %>
+            <% info_parts << @max_memory_item["dyno"] if @max_memory_item["dyno"] %>
+            <% info_parts << "T#{@max_memory_item["puma_thread_index"]}" if @max_memory_item["puma_thread_index"] %>
+            <% info_parts << "##{@max_memory_item["account_id"]}" if @max_memory_item["account_id"].present? %>
+            <% info_parts << Time.parse(@max_memory_item["recorded_at"]).utc.strftime("%m/%d %H:%M") %>
+            <%= info_parts.join(" / ") %>
+          </dd>
+        </div>
+      </div>
+    </div>
+  </div>
+<% end %>
+
+<!-- Stats summary card -->
+<div class="bg-white rounded-lg shadow px-6 py-6 mb-6">
+  <h3 class="text-lg font-medium text-gray-900 mb-4">Memory Usage Statistics</h3>
+
+  <div class="flex gap-4">
+    <div class="bg-blue-50 p-4 rounded-md flex-1 text-left">
+      <dt class="text-sm font-medium text-blue-600">Max Memory Difference</dt>
+      <dd class="mt-1 text-2xl font-semibold text-blue-900 text-left ml-0"><%= @stats[:max_memory_diff] %> MB</dd>
+    </div>
+
+    <div class="bg-green-50 p-4 rounded-md flex-1 text-left">
+      <dt class="text-sm font-medium text-green-600">Stored URLs</dt>
+      <dd class="mt-1 text-2xl font-semibold text-green-900 text-left ml-0"><%= @stats[:stored_urls_count] %>/<%= @stats[:max_stored_urls] %></dd>
+    </div>
+
+    <div class="bg-yellow-50 p-4 rounded-md flex-1 text-left">
+      <dt class="text-sm font-medium text-yellow-600">Requests Tracked</dt>
+      <dd class="mt-1 text-2xl font-semibold text-yellow-900 text-left ml-0"><%= @stats[:tracked_requests_count] %></dd>
+    </div>
+
+    <div class="bg-purple-50 p-4 rounded-md flex-1 text-left">
+      <dt class="text-sm font-medium text-purple-600">Total Requests on current dyno/Rails instance</dt>
+      <dd class="mt-1 text-2xl font-semibold text-purple-900 text-left ml-0"><%= @stats[:total_requests_count] %></dd>
+      <% if @stats[:skipped_requests_count] > 0 %>
+        <p class="text-xs text-purple-500 mt-1"><%= @stats[:skipped_requests_count] %> skipped</p>
+      <% end %>
+    </div>
+  </div>
+</div>
+
+<!-- Top URLs table -->
+<% if @top_items.any? %>
+  <div class="bg-white rounded-lg shadow overflow-hidden">
+    <div class="px-6 py-4 border-b border-gray-200">
+      <h3 class="text-lg font-medium text-gray-900">Top <%= MemHealth.configuration.max_stored_urls %> URLs by Memory Usage</h3>
+      <p class="text-sm text-gray-600 mt-1">URLs ordered by memory difference (highest first) - maximum <%= MemHealth.configuration.max_stored_urls %> URLs stored</p>
+    </div>
+
+    <table class="min-w-full divide-y divide-gray-200">
+      <thead class="bg-gray-50">
+        <tr>
+          <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Memory Diff</th>
+          <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">RAM Before</th>
+          <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">RAM After</th>
+          <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Exec Time</th>
+          <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">URL</th>
+          <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Dyno/Thread</th>
+          <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Account ID</th>
+          <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Recorded At</th>
+        </tr>
+      </thead>
+
+      <tbody class="bg-white divide-y divide-gray-200">
+        <% @top_items.each do |url_data| %>
+          <tr>
+            <td class="px-6 py-4 whitespace-nowrap">
+              <%
+                memory_color = if url_data["memory_diff"] > 10
+                  "bg-red-100 text-red-800"
+                elsif url_data["memory_diff"] > 5
+                  "bg-yellow-100 text-yellow-800"
+                else
+                  "bg-green-100 text-green-800"
+                end
+              %>
+              <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full <%= memory_color %>">
+                <%= url_data["memory_diff"] %> MB
+              </span>
+            </td>
+            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+              <%= url_data["ram_before"] ? "#{url_data["ram_before"]} MB" : "/" %>
+            </td>
+            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+              <%= url_data["ram_after"] ? "#{url_data["ram_after"]} MB" : "/" %>
+            </td>
+            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+              <%= url_data["execution_time"] ? "#{url_data["execution_time"]} s" : "/" %>
+            </td>
+            <td class="px-6 py-4 text-gray-700 url-cell">
+              <div title="<%= url_data["url"] %>" style="font-size: 0.75rem; line-height: 1rem;">
+                <% if url_data["request_method"] %>
+                  <span class="inline-flex px-1 py-0.5 font-semibold rounded <%= url_data["request_method"] == 'GET' ? 'bg-blue-100 text-blue-800' : 'bg-green-100 text-green-800' %>" style="font-size: 0.65rem;">
+                    <%= url_data["request_method"] %>
+                  </span>
+                <% end %>
+                <code class="bg-gray-100 px-1 py-0.5 rounded"><%= url_data["url"] %></code>
+              </div>
+            </td>
+            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+              <% dyno_thread = [] %>
+              <% dyno_thread << url_data["dyno"] if url_data["dyno"] %>
+              <% dyno_thread << "T#{url_data["puma_thread_index"]}" if url_data["puma_thread_index"] %>
+              <%= dyno_thread.any? ? dyno_thread.join("/") : "/" %>
+            </td>
+            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+              <%= url_data["account_id"].present? ? url_data["account_id"] : "/" %>
+            </td>
+            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+              <%= Time.parse(url_data["recorded_at"]).utc.strftime("%Y-%m-%d %H:%M") %>
+            </td>
+          </tr>
+        <% end %>
+      </tbody>
+    </table>
+  </div>
+<% else %>
+  <div class="bg-white rounded-lg shadow px-6 py-4 text-center">
+    <h3 class="text-lg font-medium text-gray-900 mb-2">No URLs Tracked Yet</h3>
+    <p class="text-gray-600">No URLs have been recorded yet.</p>
+    <p class="text-sm text-gray-500 mt-2">Memory tracking will begin after the first <%= MemHealth.configuration.skip_requests %> requests to your application.</p>
+  </div>
+<% end %>

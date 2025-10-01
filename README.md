@@ -40,13 +40,30 @@ Rails.application.routes.draw do
 end
 ```
 
+### Worker tracking setup (Sidekiq)
+
+To track memory usage in background jobs, add the middleware to your Sidekiq configuration:
+
+```ruby
+# config/initializers/sidekiq.rb
+Sidekiq.configure_server do |config|
+  config.server_middleware do |chain|
+    chain.add MemHealth::JobTrackingMiddleware
+  end
+end
+```
+
+The dashboard will show two tabs:
+- **Web Servers**: Tracks memory usage for HTTP requests
+- **Worker Servers**: Tracks memory usage for Sidekiq background jobs
+
 # Features
 
-- Real-time memory usage monitoring
-- Track highest memory consuming requests
+- Real-time memory usage monitoring for web and worker servers
+- Track highest memory consuming requests and background jobs
 - Account-level tracking for multi-tenant apps
 - Redis-based data storage
-- Web dashboard for viewing statistics
+- Web dashboard with separate views for web and worker metrics
 - Configurable thresholds and limits
 
 <img width="1139" height="680" alt="s_2" src="https://github.com/user-attachments/assets/5e170097-77cf-4ec5-a7b0-47aeaf92135f" />
@@ -97,13 +114,23 @@ end
 ## Console Usage
 
 ```ruby
-# View statistics
+# View web statistics
 MemHealth::Tracker.print_stats
 
-# Get top memory consuming URLs
+# Get top memory consuming URLs (web)
 MemHealth::Tracker.top_memory_urls
 
-# Clear all data
+# Get top memory consuming jobs (worker)
+MemHealth::Tracker.top_memory_jobs
+
+# Get worker statistics
+MemHealth::Tracker.worker_stats
+
+# Get max memory diff for web or worker
+MemHealth::Tracker.max_memory_diff(type: :web)
+MemHealth::Tracker.max_memory_diff(type: :worker)
+
+# Clear all data (web and worker)
 MemHealth::Tracker.clear_all_data
 ```
 

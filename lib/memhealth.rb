@@ -1,6 +1,8 @@
 require "mem_health/version"
 require "mem_health/configuration"
+require "mem_health/tracking_concern"
 require "mem_health/middleware"
+require "mem_health/job_tracking_middleware"
 require "mem_health/tracker"
 require "mem_health/engine"
 
