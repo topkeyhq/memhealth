@@ -30,8 +30,14 @@ module MemHealth
     private
 
     def extract_job_class(worker, job)
-      # For ActiveJob jobs, extract the actual job class from the wrapper
-      if worker.class.name == 'ActiveJob::QueueAdapters::SidekiqAdapter::JobWrapper'
+      # For ActiveJob jobs, extract the actual job class from the wrapper.
+      # Detect via the payload's "wrapped" key rather than the wrapper's class
+      # name: on Sidekiq 7+/Rails 7.1+ the old
+      # ActiveJob::QueueAdapters::SidekiqAdapter::JobWrapper constant is just an
+      # alias whose #name resolves to "Sidekiq::ActiveJob::Wrapper", so the old
+      # string comparison never matched and every job was mislabeled as the
+      # wrapper. The "wrapped" key is what the sibling extractors key off too.
+      if job['wrapped'] # ActiveJob
         job['wrapped'] || job['args']&.first&.dig('job_class') || worker.class.name
       else
         worker.class.name
