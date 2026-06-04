@@ -4,6 +4,7 @@ module MemHealth
 
     @@request_count = 0
     @@skipped_requests_count = 0
+    @@counter_mutex = Mutex.new
 
     def self.redis_tracked_requests_key
       "#{MemHealth.configuration.redis_key_prefix}:tracked_requests"
@@ -14,12 +15,13 @@ module MemHealth
     end
 
     def call(env)
-      @@request_count += 1
+      @@counter_mutex.synchronize { @@request_count += 1 }
 
       request = Rack::Request.new(env)
 
+      status = headers = response = nil
       metrics = measure_memory do
-        @status, @headers, @response = @app.call(env)
+        status, headers, response = @app.call(env)
       end
 
       # Skip the first few requests as they have large memory jumps due to class loading
@@ -40,15 +42,17 @@ module MemHealth
                            metadata.merge(execution_time: metrics[:execution_time]), type: :web)
         end
       else
-        @@skipped_requests_count += 1
+        @@counter_mutex.synchronize { @@skipped_requests_count += 1 }
       end
 
-      [@status, @headers, @response]
+      [status, headers, response]
     end
 
     def self.reset_data
-      @@request_count = 0
-      @@skipped_requests_count = 0
+      @@counter_mutex.synchronize do
+        @@request_count = 0
+        @@skipped_requests_count = 0
+      end
       MemHealth.configuration.redis.del(redis_tracked_requests_key)
     end
 
